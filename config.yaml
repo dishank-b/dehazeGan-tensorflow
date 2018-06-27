@@ -1,16 +1,18 @@
 model_params:  
   descrip: |
-            Generator have exact densenet architecture with 5 Conv layers.
-            Output feature map of every conv layer have depth of 3.
+            Experiment 2
+            Generator have alternate skip connections. i.e in_img-conv2=>conv3, conv1-conv3=>conv4, conv2-conv4=>conv5 
+            Numbers of feature map are in order of 8, 16, 32, 64, 3
             Batch Norm is used in conv 2,3,4
             No transMap inforamtion is used
+            No deconv is used
             No loss other than adversarial loss and L1 loss is used.
             Discriminator is taken from pix2pix-affiine_layer with some changes in no. of feature_maps
             All hyper parameters same as used in my_pix2pix, only the changes is made in gen and Discriminator
             No weight regularization
 
-  model_name: "" # DD or MSCNN or AOD or pix2pix or 
-  mode: "test"   # train or test
+  model_name: "AlternateConcat" # DD or MSCNN or AOD or pix2pix or 
+  mode: "train"   # train or test
   log_dir: /media/mnt/dehaze/dehazeGan_logs/ # path to write the model and load the model
 
 training_params:

@@ -26,26 +26,31 @@ class dehazeGan(object):
 		variables_names = [[v.name, v.get_shape().as_list()] for v in tf.trainable_variables()]
 		print "Trainable Variables:"
 		tot_params = 0
+		gen_param = 0
 		for i in variables_names:
 			var_params = np.prod(np.array(i[1]))
 			tot_params += var_params
 			print i[0], i[1], var_params
+			if "generator" in i[0]:
+				gen_param+=var_params
 		print "Total number of Trainable Parameters: ", str(tot_params/1000.0)+"K"
+		print "Total number of Generator Parameters: ", str(gen_param/1000.0)+"K"
+
 
 	def _generator(self, input_img):
 		with tf.variable_scope("generator") as scope:
-			conv1 = conv_2d(input_img, output_chan=3, kernel=[3,3], stride=[1,1], use_bn=False, activation=leaky_relu,
+			conv1 = conv_2d(input_img, output_chan=8, kernel=[3,3], stride=[1,1], use_bn=False, activation=leaky_relu,
 				train_phase=self.train_phase, name="conv1")
-			in_concat = tf.concat([input_img, conv1], axis=3, name="concat1")
-			conv2 = conv_2d(in_concat, output_chan=3, kernel=[3,3], stride=[1,1], use_bn=True, activation=leaky_relu,
+			# in_concat = tf.concat([input_img, conv1], axis=3, name="concat1")
+			conv2 = conv_2d(conv1, output_chan=16, kernel=[3,3], stride=[1,1], use_bn=True, activation=leaky_relu,
 				train_phase=self.train_phase, name="conv2")
-			in_concat = tf.concat([input_img, conv1, conv2], axis=3,name="concat2")
-			conv3 = conv_2d(in_concat, output_chan=3, kernel=[3,3], stride=[1,1], use_bn=True, activation=leaky_relu,
+			in_concat = tf.concat([input_img, conv2], axis=3,name="concat2")
+			conv3 = conv_2d(in_concat, output_chan=32, kernel=[3,3], stride=[1,1], use_bn=True, activation=leaky_relu,
 				train_phase=self.train_phase, name="conv3")
-			in_concat = tf.concat([input_img, conv1, conv2, conv3], axis=3, name="concat3")
-			conv4 = conv_2d(in_concat, output_chan=3, kernel=[3,3], stride=[1,1], use_bn=True, activation=leaky_relu,
+			in_concat = tf.concat([conv1, conv3], axis=3, name="concat3")
+			conv4 = conv_2d(in_concat, output_chan=64, kernel=[3,3], stride=[1,1], use_bn=True, activation=leaky_relu,
 				train_phase=self.train_phase, name="conv4")
-			in_concat = tf.concat([input_img, conv1, conv2, conv3, conv4], axis=3, name="concat4")
+			in_concat = tf.concat([conv2, conv4], axis=3, name="concat4")
 			conv5 = conv_2d(in_concat, output_chan=3, kernel=[3,3], stride=[1,1], use_bn=False, activation=tf.tanh,
 				train_phase=self.train_phase, name="conv5")
 			
@@ -100,12 +105,6 @@ class dehazeGan(object):
 		with tf.name_scope("Optimizers") as scope:
 			dis_var_list = [var for var in tf.trainable_variables() if "discriminator" in var.name]
 			gen_var_list = [var for var in tf.trainable_variables() if "generator" in var.name]
-			print "Generator"
-			for var in gen_var_list:
-				print var.name
-			print "discriminator"
-			for var in dis_var_list:
-				print var.name
 
 			self.dis_solver = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5).minimize(self.dis_loss, var_list=dis_var_list)
 
@@ -206,7 +205,7 @@ class dehazeGan(object):
 	def test(self, batch_size):
 		self.sess=tf.Session()
 		
-		saver = tf.train.import_meta_graph(self.save_path+'pix2pix-190.meta')
+		saver = tf.train.import_meta_graph(self.save_path+'pix2pix-200.meta')
 		print self.save_path
 		saver.restore(self.sess,tf.train.latest_checkpoint(self.save_path))
 		print self.save_path
