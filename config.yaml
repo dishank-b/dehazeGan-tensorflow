@@ -1,23 +1,22 @@
 model_params:  
   descrip: |
-            Experiment 2
-            Generator have alternate skip connections. i.e in_img-conv2=>conv3, conv1-conv3=>conv4, conv2-conv4=>conv5 
-            Numbers of feature map are in order of 8, 16, 32, 64, 3
-            Batch Norm is used in conv 2,3,4
+            Experiment 3
+            Generator have a U-net with 3 enc and 3 deconv
+            Numbers of feature map are in order of 16,256,512 - Veru high
+            Batch Norm is used in last two enc and first two dec
             No transMap inforamtion is used
-            No deconv is used
             No loss other than adversarial loss and L1 loss is used.
             Discriminator is taken from pix2pix-affiine_layer with some changes in no. of feature_maps
             All hyper parameters same as used in my_pix2pix, only the changes is made in gen and Discriminator
             No weight regularization
 
-  model_name: "AlternateConcat" # DD or MSCNN or AOD or pix2pix or 
+  model_name: "3enc3dec" # DD or MSCNN or AOD or pix2pix or 
   mode: "train"   # train or test
   log_dir: /media/mnt/dehaze/dehazeGan_logs/ # path to write the model and load the model
 
 training_params:
   learning_rate: 1e-04
   epochs: 201
-  batch_size: 32
+  batch_size: 16
   # data_path: /media/mnt/dehaze/data/ChinaMM18dehaze/  # Path from where to load the data
   data_path: /media/mnt/dehaze/data/cityscape/processed/

@@ -59,8 +59,8 @@ if mode=='train':
 	nnet.train_model(train_img1[:4000] , val_img1[:500], learning_rate, batch_size, epoch_size)
 else:
 	print model_path
-	# predict_clear= nnet.test(train_img1[:4000,0,:,:,:], batch_size)
-	predict_clear= nnet.test(batch_size)
+	predict_clear= nnet.test(train_img1[:4000,0,:,:,:], batch_size)
+	# predict_clear= nnet.test(batch_size)
 	for i in range(train_img1[:4000].shape[0]):
 		pair2 = np.hstack(((train_img1[i,0,:,:,:]+1)*127.5,(train_img1[i,1,:,:,:]+1)*127.5, predict_clear[i]*255.0))
 		cv2.imwrite(model_path+"/results/train/"+str(i)+"_clear.jpg", pair2)

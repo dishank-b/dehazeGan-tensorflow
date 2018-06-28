@@ -39,27 +39,28 @@ class dehazeGan(object):
 
 	def _generator(self, input_img):
 		with tf.variable_scope("generator") as scope:
-			conv1 = conv_2d(input_img, output_chan=8, kernel=[3,3], stride=[1,1], use_bn=False, activation=leaky_relu,
-				train_phase=self.train_phase, name="conv1")
-			# in_concat = tf.concat([input_img, conv1], axis=3, name="concat1")
-			conv2 = conv_2d(conv1, output_chan=16, kernel=[3,3], stride=[1,1], use_bn=True, activation=leaky_relu,
-				train_phase=self.train_phase, name="conv2")
-			in_concat = tf.concat([input_img, conv2], axis=3,name="concat2")
-			conv3 = conv_2d(in_concat, output_chan=32, kernel=[3,3], stride=[1,1], use_bn=True, activation=leaky_relu,
-				train_phase=self.train_phase, name="conv3")
-			in_concat = tf.concat([conv1, conv3], axis=3, name="concat3")
-			conv4 = conv_2d(in_concat, output_chan=64, kernel=[3,3], stride=[1,1], use_bn=True, activation=leaky_relu,
-				train_phase=self.train_phase, name="conv4")
-			in_concat = tf.concat([conv2, conv4], axis=3, name="concat4")
-			conv5 = conv_2d(in_concat, output_chan=3, kernel=[3,3], stride=[1,1], use_bn=False, activation=tf.tanh,
-				train_phase=self.train_phase, name="conv5")
-			
-			# with tf.variable_scope("decoder") as scope:
-			# 	dec4 = deconv_2d(enc4, output_chan=256, kernel=[4,4], stride=[2,2], use_bn=True,
-			# 		train_phase=self.train_phase, name="dec4")
-				
+			with tf.variable_scope("encoder") as scope:
+				enc1 = conv_2d(input_img, output_chan=64, kernel=[4,4], stride=[2,2], use_bn=False, activation=leaky_relu,
+					train_phase=self.train_phase, name="enc1")
+				print "1",enc1.get_shape()
+				enc2 = conv_2d(enc1, output_chan=256, kernel=[4,4], stride=[2,2], use_bn=True, activation=leaky_relu,
+					train_phase=self.train_phase, name="enc2")
+				print "2",enc2.get_shape()
+				enc3 = conv_2d(enc2, output_chan=512, kernel=[4,4], stride=[2,2], use_bn=True, activation=None,
+					train_phase=self.train_phase, name="enc3")
+				# enc3 = conv_2d(enc2, output_chan=512, kernel=[4,4], stride=[2,2], use_bn=True, activation=leaky_relu,
+				# 	train_phase=self.train_phase, name="enc3")
+				print "3",enc3.get_shape()
+		
+			with tf.variable_scope("decoder") as scope:
+				dec3 = deconv_2d(enc3, output_chan=256, kernel=[4,4], stride=[2,2], use_bn=True,
+					train_phase=self.train_phase, name="dec3")
+				dec2 = deconv_2d(tf.concat([dec3, enc2], 3), output_chan=64, kernel=[4,4], stride=[2,2], use_bn=True,
+					train_phase=self.train_phase, name="dec2")
+				dec1 = deconv_2d(tf.concat([dec2, enc1], 3), output_chan=3, kernel=[4,4], stride=[2,2], use_bn=False,
+					activation=tf.tanh, train_phase=self.train_phase, name="dec1")
 
-		return conv5
+		return dec1
 
 	def _discriminator(self, gen_input, gen_output, reuse):
 		with tf.variable_scope("discriminator", reuse=reuse) as scope:
@@ -134,7 +135,7 @@ class dehazeGan(object):
 		# print "Validation Images: ", val_imgs[0].shape[0]
 		print "Learning_rate: ", learning_rate, "Batch_size", batch_size, "Epochs", epoch_size
 		raw_input("Training will start above configuration. Press Enter to Start....")
-		
+		file = open(self.model_path+"/loss.txt", 'w')
 		count = 0
 		with tf.name_scope("Training") as scope:
 			for epoch in range(epoch_size):
@@ -149,12 +150,13 @@ class dehazeGan(object):
 					dis_in = [self.dis_solver, self.dis_loss, self.dis_summ]
 					dis_out = self.sess.run(dis_in, {self.haze_in:haze_in, self.clear_in: clear_in, self.train_phase:True})
 
-					sess_in = [self.gen_solver, self.gen_ad_loss, self.gen_L1_loss, self.gen_summ]
+					sess_in = [self.gen_solver, self.gen_ad_loss, self.gen_L1_loss, self.gen_summ, self.gen_out]
 					gen_out = self.sess.run(sess_in, {self.haze_in:haze_in, self.clear_in: clear_in, self.train_phase:True})
 					
 					if itr%5==0:
 						print "Epoch:", epoch, "Iteration:", itr/batch_size, "Dis Loss:", dis_out[1], "Gen L1:", gen_out[2], \
 						"Gen adver:", gen_out[1]
+						file.write("Epoch: {} Iteration: {} Dis Loss: {} Gen L1: {} Gen adver: {} \n".format(epoch, itr/batch_size, dis_out[1], gen_out[2], gen_out[1]))
 					 
 					self.train_writer.add_summary(dis_out[2], count)
 					self.train_writer.add_summary(gen_out[3], count)
@@ -173,6 +175,8 @@ class dehazeGan(object):
 
 					print "Validation Epoch:", epoch, "Iteration:", itr/batch_size, "Dis Loss:", sess_out[0], "Gen L1:", sess_out[2], \
 						"Gen adver:", sess_out[1]
+					file.write("Validation Epoch: {} Iteration: {} Dis Loss: {} Gen L1: {} Gen adver: {} \n".format(epoch, itr/batch_size, \
+						sess_out[0], sess_out[2], sess_out[1]))
 
 				if epoch%10==0:
 					self.saver.save(self.sess, self.save_path+"pix2pix", global_step=epoch)
@@ -183,9 +187,10 @@ class dehazeGan(object):
 					# random_img = train_imgs[0][a]
 
 					# gen_imgs = self.sess.run(self.clearImg, {self.haze_in: random_img[:,0,:,:,:], self.trans_in: train_imgs[1][a], self.train_phase:False})
-					# for i,j,k in zip(random_img[:,0,:,:,:], random_img[:,1,:,:,:], gen_imgs):
-					# 	stack = np.hstack((i,j,k))
-					# 	cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", 255.0*stack)
+				idx = np.random.randint(batch_size)
+				stack = np.hstack((train_imgs[idx,0,:,:,:],train_imgs[idx,1,:,:,:],gen_out[4][idx]))
+				cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", (stack+1)*127.5)
+			file.close()
 
 	def single_img_pass(self, input_imgs, x, y, is_train):
 		out_images = []
@@ -201,8 +206,8 @@ class dehazeGan(object):
 			out_images.append((clear[0]+1)/2)
 		return np.array(out_images)
 
-	# def test(self, input_imgs, batch_size):
-	def test(self, batch_size):
+	# def test(self, batch_size):
+	def test(self, input_imgs, batch_size):
 		self.sess=tf.Session()
 		
 		saver = tf.train.import_meta_graph(self.save_path+'pix2pix-200.meta')
@@ -213,7 +218,7 @@ class dehazeGan(object):
 
 		x = graph.get_tensor_by_name("Inputs/Haze_Image:0")
 		is_train = graph.get_tensor_by_name("Inputs/is_training:0")
-		y = graph.get_tensor_by_name("Model/generator/conv5/Tanh:0")
+		y = graph.get_tensor_by_name("Model/generator/decoder/dec1/Tanh:0")
 
 		# print "Tensor Loaded"
 		# for itr in xrange(0, input_imgs.shape[0], batch_size):
