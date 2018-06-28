@@ -4,10 +4,11 @@ import tensorflow as tf
 import numpy as np
 
 def conv_2d(x, output_chan, kernel=[5,5], stride=[2,2],padding="SAME" ,activation=tf.nn.relu, use_bn=False, train_phase=True,add_summary=False,name="Conv_2D"):
-	input_shape = x.get_shape()
-	kern = [kernel[0], kernel[1], input_shape[-1], output_chan]
-	strd = [1, stride[0], stride[1], 1]
 	with tf.variable_scope(name) as scope:
+		input_shape = x.get_shape()
+		kern = [kernel[0], kernel[1], input_shape[-1], output_chan]
+		strd = [1, stride[0], stride[1], 1]
+		
 		W = tf.get_variable(name="W", shape=kern, initializer=tf.random_normal_initializer(0, 0.02))
 		b = tf.get_variable(name="b", shape=[output_chan], initializer=tf.random_normal_initializer(0, 0.02))
 
@@ -30,12 +31,13 @@ def conv_2d(x, output_chan, kernel=[5,5], stride=[2,2],padding="SAME" ,activatio
 		return out
 
 def deconv_2d(x, output_chan, kernel=[5,5], stride=[2,2], padding="SAME",activation=tf.nn.relu, use_bn=False, train_phase=True,add_summary=False, name="D_conv2D"):
-	input_shape = x.get_shape().as_list()
-	kern = [kernel[0], kernel[1], output_chan, input_shape[-1]]
-	strd = [1, stride[0], stride[1], 1]
-	batch_size = tf.shape(x)[0]
-	output_shape = [batch_size,input_shape[1]*strd[1],input_shape[2]*strd[2],output_chan]
 	with tf.variable_scope(name) as scope:
+		input_shape = x.get_shape().as_list()
+		kern = [kernel[0], kernel[1], output_chan, input_shape[-1]]
+		strd = [1, stride[0], stride[1], 1]
+		batch_size = tf.shape(x)[0]
+		output_shape = [batch_size,input_shape[1]*strd[1],input_shape[2]*strd[2],output_chan]
+		
 		W = tf.get_variable(name="W", shape=kern, initializer=tf.random_normal_initializer(0, 0.02))
 		b = tf.get_variable(name="b", shape=[output_chan], initializer=tf.random_normal_initializer(0, 0.02))
 
@@ -88,6 +90,7 @@ def bn(x, is_train=True):
 	# return tf.contrib.layers.batch_norm(x, decay= 0.90, is_training=is_train, param_initializers=tf.random_normal_initializer(1.0, 0.02) ,scale=True, reuse=False)
 
 def leaky_relu(x, alpha=0.2):
+	print "yes"
 	return tf.nn.leaky_relu(x, alpha)
 
 def BReLU(x, tmin=0.0, tmax=1.0):
