@@ -35,31 +35,39 @@ class dehazeGan(object):
 				gen_param+=var_params
 		print "Total number of Trainable Parameters: ", str(tot_params/1000.0)+"K"
 		print "Total number of Generator Parameters: ", str(gen_param/1000.0)+"K"
+		return str(tot_params/1000.0)+"K", str(gen_param/1000.0)+"K"
 
 
 	def _generator(self, input_img):
 		with tf.variable_scope("generator") as scope:
-			conv1 = conv_2d(input_img, output_chan=64, kernel=[4,4], stride=[1,1], use_bn=False, activation=leaky_relu,
+			conv1 = conv_2d(input_img, output_chan=16, kernel=[3,3], stride=[1,1], use_bn=False, activation=leaky_relu,
 				train_phase=self.train_phase, name="conv1")
-			# in_concat = tf.concat([input_img, conv1], axis=3, name="concat1")
-			conv2 = conv_2d(conv1, output_chan=128, kernel=[4,4], stride=[1,1], use_bn=True, activation=leaky_relu,
+			print conv1.get_shape()
+			conv2 = conv_2d(conv1, output_chan= 32, kernel=[3, 3], stride=[3, 3], use_bn=True, activation=leaky_relu,
 				train_phase=self.train_phase, name="conv2")
-			in_concat = tf.concat([input_img, conv2], axis=3,name="concat2")
-			conv3 = conv_2d(in_concat, output_chan=512, kernel=[4,4], stride=[1,1], use_bn=True, activation=leaky_relu,
+			print conv2.get_shape()
+			conv3 = conv_2d(conv2, output_chan= 256, kernel=[3, 3], stride=[2, 2], use_bn=True, activation=leaky_relu,
 				train_phase=self.train_phase, name="conv3")
-			in_concat = tf.concat([conv1, conv3], axis=3, name="concat3")
-			conv4 = conv_2d(in_concat, output_chan=128, kernel=[4,4], stride=[1,1], use_bn=True, activation=leaky_relu,
+			print conv3.get_shape()
+			conv4 = conv_2d(conv2, output_chan= 256, kernel=[5, 5], stride=[2, 2], use_bn=True, activation=leaky_relu,
 				train_phase=self.train_phase, name="conv4")
-			in_concat = tf.concat([conv2, conv4], axis=3, name="concat4")
-			conv5 = conv_2d(in_concat, output_chan=3, kernel=[4,4], stride=[1,1], use_bn=False, activation=tf.tanh,
+			print conv4.get_shape()
+			in_concat = tf.concat([conv3, conv4], axis=3,name="concat1")
+			conv5 = deconv_2d(in_concat, output_chan=32, kernel=[4,4], stride=[2,2], use_bn=True, activation=leaky_relu,
 				train_phase=self.train_phase, name="conv5")
-			
-			# with tf.variable_scope("decoder") as scope:
-			# 	dec4 = deconv_2d(enc4, output_chan=256, kernel=[4,4], stride=[2,2], use_bn=True,
-			# 		train_phase=self.train_phase, name="dec4")
-				
-
-		return conv5
+			print conv5.get_shape()
+			conv2_pad = tf.pad(conv2, [[0, 0], [0, 0], [0, 1], [0, 0]], "SYMMETRIC")
+			print conv2_pad.get_shape()
+			in_concat = tf.concat([conv2_pad, conv5], axis=3, name="concat2")
+			conv6 = deconv_2d(in_concat, output_chan=16, kernel=[3,3], stride=[3, 3], use_bn=True, activation=leaky_relu,
+				train_phase=self.train_phase, name="conv6")
+			print conv6.get_shape()
+			in_concat = tf.concat([conv1, conv6[:,:,2:-2,:]], axis=3, name="concat3")
+			conv7 = deconv_2d(in_concat, output_chan=3, kernel=[3,3], stride=[1,1], use_bn=False, activation=tf.tanh,
+				train_phase=self.train_phase, name="conv7")
+			print conv7.get_shape()
+		
+		return conv7
 
 	def _discriminator(self, gen_input, gen_output, reuse):
 		with tf.variable_scope("discriminator", reuse=reuse) as scope:
@@ -124,7 +132,10 @@ class dehazeGan(object):
 		self.val_writer.add_graph(self.sess.graph)
 		self.saver = tf.train.Saver()
 		self.sess.run(tf.global_variables_initializer())
-		self._debug_info()
+		no_params, gen_params = self._debug_info()
+		self.file = open(self.model_path+"/loss.txt", 'w')
+		self.file.write("Number of Parameters: {}\n".format(no_params))
+		self.file.write("Number of Generator Parameters: {}\n".format(gen_params))
 
 	def train_model(self, train_imgs, val_imgs, learning_rate=1e-5, batch_size=32, epoch_size=50):
 		
@@ -134,8 +145,8 @@ class dehazeGan(object):
 		# print "Validation Images: ", val_imgs[0].shape[0]
 		print "Learning_rate: ", learning_rate, "Batch_size", batch_size, "Epochs", epoch_size
 		raw_input("Training will start above configuration. Press Enter to Start....")
-		file = open(self.model_path+"/loss.txt", 'w')
 		count = 0
+		min_val_loss = 100.0
 		with tf.name_scope("Training") as scope:
 			for epoch in range(epoch_size):
 				for itr in xrange(0, train_imgs.shape[0]-batch_size, batch_size):
@@ -149,24 +160,26 @@ class dehazeGan(object):
 					dis_in = [self.dis_solver, self.dis_loss, self.dis_summ]
 					dis_out = self.sess.run(dis_in, {self.haze_in:haze_in, self.clear_in: clear_in, self.train_phase:True})
 
-					sess_in = [self.gen_solver, self.gen_ad_loss, self.gen_L1_loss, self.gen_summ, self.gen_out]
+					sess_in = [self.gen_solver, self.gen_ad_loss, self.gen_L1_loss, self.gen_summ]
 					gen_out = self.sess.run(sess_in, {self.haze_in:haze_in, self.clear_in: clear_in, self.train_phase:True})
 					
 					if itr%5==0:
 						print "Epoch:", epoch, "Iteration:", itr/batch_size, "Dis Loss:", dis_out[1], "Gen L1:", gen_out[2], \
 						"Gen adver:", gen_out[1]
-						file.write("Epoch: {} Iteration: {} Dis Loss: {} Gen L1: {} Gen adver: {} \n".format(epoch, itr/batch_size, dis_out[1], gen_out[2], gen_out[1]))
+						self.file.write("Epoch: {} Iteration: {} Dis Loss: {} Gen L1: {} Gen adver: {} \n".format(epoch, itr/batch_size, dis_out[1], gen_out[2], gen_out[1]))
 					 
 					self.train_writer.add_summary(dis_out[2], count)
 					self.train_writer.add_summary(gen_out[3], count)
 					count = count +1
 					
+				lol=0
+				val_sum=0
 				for itr in xrange(0, val_imgs.shape[0]-batch_size, batch_size):
 					haze_in = val_imgs[itr:itr+batch_size,0]
 					clear_in = val_imgs[itr:itr+batch_size,1]
 					# trans_in = val_imgs[1][itr:itr+batch_size]
 
-					sess_in = [self.dis_loss, self.gen_ad_loss, self.gen_L1_loss,self.dis_summ, self.gen_summ]
+					sess_in = [self.dis_loss, self.gen_ad_loss, self.gen_L1_loss,self.dis_summ, self.gen_summ, self.gen_out]
 					sess_out = self.sess.run(sess_in, {self.haze_in: haze_in, 
 												self.clear_in: clear_in,self.train_phase:False})
 					self.val_writer.add_summary(sess_out[3], count)
@@ -174,22 +187,21 @@ class dehazeGan(object):
 
 					print "Validation Epoch:", epoch, "Iteration:", itr/batch_size, "Dis Loss:", sess_out[0], "Gen L1:", sess_out[2], \
 						"Gen adver:", sess_out[1]
-					file.write("Validation Epoch: {} Iteration: {} Dis Loss: {} Gen L1: {} Gen adver: {} \n".format(epoch, itr/batch_size, \
+					self.file.write("Validation Epoch: {} Iteration: {} Dis Loss: {} Gen L1: {} Gen adver: {} \n".format(epoch, itr/batch_size, \
 						sess_out[0], sess_out[2], sess_out[1]))
+					lol+=1
+					val_sum+=sess_out[2]
+				val_loss = val_sum/lol
 
-				if epoch%10==0:
+				if (val_loss<min_val_loss or epoch==epoch_size-1):
+					min_val_loss = val_loss
 					self.saver.save(self.sess, self.save_path+"pix2pix", global_step=epoch)
 					print "Checkpoint saved"
 
-					# a = np.random.randint(1, train_phaseimgs[0].shape[0], 1)
-					
-					# random_img = train_imgs[0][a]
-
-					# gen_imgs = self.sess.run(self.clearImg, {self.haze_in: random_img[:,0,:,:,:], self.trans_in: train_imgs[1][a], self.train_phase:False})
 				idx = np.random.randint(batch_size)
-				stack = np.hstack((haze_in[idx], clear_in[idx], gen_out[4][idx]))
+				stack = np.hstack((haze_in[idx], clear_in[idx], sess_out[5][idx]))
 				cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", (stack+1)*127.5)
-			file.close()
+			self.file.close()
 
 	def single_img_pass(self, input_imgs, x, y, is_train):
 		out_images = []
@@ -209,7 +221,7 @@ class dehazeGan(object):
 	def test(self, input_imgs, batch_size):
 		self.sess=tf.Session()
 		
-		saver = tf.train.import_meta_graph(self.save_path+'pix2pix-200.meta')
+		saver = tf.train.import_meta_graph(self.save_path+'pix2pix-56.meta')
 		print self.save_path
 		saver.restore(self.sess,tf.train.latest_checkpoint(self.save_path))
 		print self.save_path
@@ -217,8 +229,8 @@ class dehazeGan(object):
 
 		x = graph.get_tensor_by_name("Inputs/Haze_Image:0")
 		is_train = graph.get_tensor_by_name("Inputs/is_training:0")
-		y = graph.get_tensor_by_name("Model/generator/decoder/dec1/Tanh:0")
-		# y = graph.get_tensor_by_name("Model/generator/conv5/Tanh:0")
+		# y = graph.get_tensor_by_name("Model/generator/decoder/dec1/Tanh:0")
+		y = graph.get_tensor_by_name("Model/generator/conv7/Tanh:0")
 
 		# print "Tensor Loaded"
 		# for itr in xrange(0, input_imgs.shape[0], batch_size):
@@ -235,11 +247,11 @@ class dehazeGan(object):
 		# print "Output Shape:", tot_clr.shape
 		# batch_out = (tot_clr+1)/2
 
-		# return self.single_img_pass(input_imgs, x, y, is_train)
+		self.single_img_pass(input_imgs, x, y, is_train)
 
-		img_name = glob.glob("/media/mnt/dehaze/*_resize.jpg")
-		for image in img_name:
-			img = cv2.imread(image)
-			in_img = img.reshape((1, img.shape[0],img.shape[1],img.shape[2]))
-			out = self.sess.run(y, {x:in_img/127.5-1, is_train:False})
-			cv2.imwrite(image[:-4]+"_clear.jpg", (out[0]+1)*127.5)
+		# img_name = glob.glob("/media/mnt/dehaze/*_resize.jpg")
+		# for image in img_name:
+		# 	img = cv2.imread(image)
+		# 	in_img = img.reshape((1, img.shape[0],img.shape[1],img.shape[2]))
+		# 	out = self.sess.run(y, {x:in_img/127.5-1, is_train:False})
+		# 	cv2.imwrite(image[:-4]+"_clear.jpg", (out[0]+1)*127.5)

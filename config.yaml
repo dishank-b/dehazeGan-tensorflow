@@ -1,17 +1,18 @@
 model_params:  
   descrip: |
-            Experiment 4
-            Architecture Same as alternate concat but with increase feature map depth
-            Numbers of feature map are in order of 16,128,512,128,3 - Very high
-            Batch Norm is used in 2,3,4
-            No transMap inforamtion is used
-            No loss other than adversarial loss and L1 loss is used.
-            Discriminator is taken from pix2pix-affiine_layer with some changes in no. of feature_maps
-            All hyper parameters same as used in my_pix2pix, only the changes is made in gen and Discriminator
-            No weight regularization
+            
+            -Experiment 5
+            -U-net kind of architecture with inception block
+            -Numbers of feature map are in order of 16,32,256
+            -Batch Norm is used in all just not in first and last
+            -No transMap inforamtion is used
+            -No loss other than adversarial loss and L1 loss is used.
+            -Discriminator is taken from pix2pix-affiine_layer with some changes in no. of feature_maps
+            -All hyper parameters same as used in my_pix2pix, only the changes is made in gen and Discriminator
+            -No weight regularization
 
-  model_name: "alternateConcat-deep" # DD or MSCNN or AOD or pix2pix or 
-  mode: "test"   # train or test
+  model_name: "U-net-inception" # DD or MSCNN or AOD or pix2pix or 
+  mode: "train"   # train or test
   log_dir: /media/mnt/dehaze/dehazeGan_logs/ # path to write the model and load the model
 
 training_params:

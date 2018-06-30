@@ -86,11 +86,10 @@ def bn(x, is_train=True):
 	If you are not using update_collection=None here, then make sure to add
 	control dependency of tf.GraphKeys.UPDATE_OPS before running optimizer op.
 	"""
-	return tf.layers.batch_normalization(x, axis=3, epsilon=1e-5, momentum=0.1, training=is_train, gamma_initializer=tf.random_normal_initializer(1.0, 0.02), reuse=False)
+	return tf.layers.batch_normalization(x, axis=3, epsilon=1e-5, momentum=0.95, training=is_train, gamma_initializer=tf.random_normal_initializer(1.0, 0.02), reuse=False)
 	# return tf.contrib.layers.batch_norm(x, decay= 0.90, is_training=is_train, param_initializers=tf.random_normal_initializer(1.0, 0.02) ,scale=True, reuse=False)
 
 def leaky_relu(x, alpha=0.2):
-	print "yes"
 	return tf.nn.leaky_relu(x, alpha)
 
 def BReLU(x, tmin=0.0, tmax=1.0):
