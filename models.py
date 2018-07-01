@@ -40,7 +40,7 @@ class dehazeGan(object):
 
 	def _generator(self, input_img):
 		with tf.variable_scope("generator") as scope:
-			conv1 = conv_2d(input_img, output_chan=16, kernel=[1,1], stride=[1,1], use_bn=False, activation=leaky_relu,
+			conv1 = conv_2d(input_img, output_chan=16, kernel=[3,3], stride=[1,1], use_bn=False, activation=leaky_relu,
 				train_phase=self.train_phase, name="conv1")
 			print conv1.get_shape()
 			conv2 = conv_2d(conv1, output_chan= 64, kernel=[3, 3], stride=[3, 3], use_bn=True, activation=leaky_relu,
@@ -53,19 +53,19 @@ class dehazeGan(object):
 				train_phase=self.train_phase, name="conv4")
 			print conv4.get_shape()
 			in_concat = tf.concat([conv3, conv4], axis=3,name="concat1")
-			upsample1 = max_unpool(in_concat, [2,2], "upsample1")
+			upsample1 = unpool(in_concat, [2,2], "upsample1")
 			conv5 = conv_2d(upsample1, output_chan=64, kernel=[3,3], stride=[1,1], use_bn=True, activation=leaky_relu,
 				train_phase=self.train_phase, name="conv5")
 			print conv5.get_shape()
 			conv2_pad = tf.pad(conv2, [[0, 0], [0, 0], [0, 1], [0, 0]], "SYMMETRIC")
 			print conv2_pad.get_shape()
 			in_concat = tf.concat([conv2_pad, conv5], axis=3, name="concat2")
-			upsample2 = max_unpool(in_concat, [3,3], "upsample2")
+			upsample2 = unpool(in_concat, [3,3], "upsample2")
 			conv6 = conv_2d(upsample2, output_chan=32, kernel=[3,3], stride=[1, 1], use_bn=True, activation=leaky_relu,
 				train_phase=self.train_phase, name="conv6")
 			print conv6.get_shape()
 			in_concat = tf.concat([conv1, conv6[:,:,2:-2,:]], axis=3, name="concat3")
-			conv7 = conv_2d(in_concat, output_chan=3, kernel=[1,1], stride=[1,1], use_bn=False, activation=tf.tanh,
+			conv7 = conv_2d(in_concat, output_chan=3, kernel=[3,3], stride=[1,1], use_bn=False, activation=tf.tanh,
 				train_phase=self.train_phase, name="conv7")
 			print conv7.get_shape()
 		
@@ -196,7 +196,6 @@ class dehazeGan(object):
 				val_loss = val_sum/lol
 				print "Validation L1 Loss", val_loss
 				self.file.write("Epoch: {} Validation L1 Loss: {}\n".format(epoch, val_loss))
-				
 				if (val_loss<min_val_loss or epoch==epoch_size-1):
 					min_val_loss = val_loss
 					self.saver.save(self.sess, self.save_path+"pix2pix", global_step=epoch)

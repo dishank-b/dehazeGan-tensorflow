@@ -110,8 +110,8 @@ def max_pool(input, kernel=3, stride=2, name=None):
          padding='SAME')
       return output
 
-def max_unpool(value, name):
+def unpool(value, kernel=[2,2] ,name="upsample"):
 	with tf.variable_scope(name) as scope:
-		unpool_layer = tf.keras.layers.UpSampling2D((2,2))
+		unpool_layer = tf.keras.layers.UpSampling2D(kernel)
 		out = unpool_layer.call(value)
 		return out
