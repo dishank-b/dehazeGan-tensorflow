@@ -40,36 +40,51 @@ class dehazeGan(object):
 
 	def _generator(self, input_img):
 		with tf.variable_scope("generator") as scope:
-			conv1 = conv_2d(input_img, output_chan=16, kernel=[3,3], stride=[1,1], use_bn=False, activation=leaky_relu,
-				train_phase=self.train_phase, name="conv1")
-			print conv1.get_shape()
-			conv2 = conv_2d(conv1, output_chan= 32, kernel=[3, 3], stride=[3, 3], use_bn=True, activation=leaky_relu,
-				train_phase=self.train_phase, name="conv2")
-			print conv2.get_shape()
-			conv3 = conv_2d(conv2, output_chan= 128, kernel=[3, 3], stride=[2, 2], use_bn=True, activation=leaky_relu,
-				train_phase=self.train_phase, name="conv3")
-			print conv3.get_shape()
-			conv4 = conv_2d(conv2, output_chan= 128, kernel=[5, 5], stride=[2, 2], use_bn=True, activation=leaky_relu,
-				train_phase=self.train_phase, name="conv4")
-			print conv4.get_shape()
-			in_concat = tf.concat([conv3, conv4], axis=3,name="concat1")
-			upsample1 = unpool(in_concat, [2,2], "upsample1")
-			conv5 = conv_2d(upsample1, output_chan=32, kernel=[3,3], stride=[1,1], use_bn=True, activation=leaky_relu,
-				train_phase=self.train_phase, name="conv5")
-			print conv5.get_shape()
-			conv2_pad = tf.pad(conv2, [[0, 0], [0, 0], [0, 1], [0, 0]], "SYMMETRIC")
-			print conv2_pad.get_shape()
-			in_concat = tf.concat([conv2_pad, conv5], axis=3, name="concat2")
-			upsample2 = unpool(in_concat, [3,3], "upsample2")
-			conv6 = conv_2d(upsample2, output_chan=16, kernel=[3,3], stride=[1, 1], use_bn=True, activation=leaky_relu,
-				train_phase=self.train_phase, name="conv6")
-			print conv6.get_shape()
-			in_concat = tf.concat([conv1, conv6[:,:,2:-2,:]], axis=3, name="concat3")
-			conv7 = conv_2d(in_concat, output_chan=3, kernel=[3,3], stride=[1,1], use_bn=False, activation=tf.tanh,
-				train_phase=self.train_phase, name="conv7")
-			print conv7.get_shape()
-		
-		return conv7
+			with tf.variable_scope("TransMap") as scope:
+				trans_conv1 = conv_2d(input_img, output_chan= 10, kernel=[3, 3], stride=[2, 2], use_bn=False, activation=leaky_relu,
+					train_phase=self.train_phase, name="transconv1")
+				print trans_conv1.get_shape()
+				trans_conv2 = conv_2d(trans_conv1, output_chan= 10, kernel=[3, 3], stride=[3, 3], use_bn=True, activation=leaky_relu,
+					train_phase=self.train_phase, name="transconv2")
+				print trans_conv2.get_shape()
+				trans_conv3 = conv_2d(unpool(trans_conv2, [3,3], "upsample1"), output_chan= 10, kernel=[3, 3], stride=[1, 1], use_bn=True, activation=leaky_relu,
+					train_phase=self.train_phase, name="transconv3")
+				print trans_conv3.get_shape()
+				trans_conv4 = conv_2d(unpool(trans_conv3,[2,2] ,"upsample2"), output_chan= 1, kernel=[3, 3], stride=[1, 1], use_bn=False, activation=tf.tanh,
+					train_phase=self.train_phase, name="transconv4")
+				trans_conv4 = trans_conv4[:,:,2:-2,:]
+				
+			with tf.variable_scope("clear_image") as scope:
+				conv1 = conv_2d(input_img, output_chan=16, kernel=[3,3], stride=[1,1], use_bn=False, activation=leaky_relu,
+					train_phase=self.train_phase, name="conv1")
+				print conv1.get_shape()
+				conv2 = conv_2d(conv1, output_chan= 32, kernel=[3, 3], stride=[2, 2], use_bn=True, activation=leaky_relu,
+					train_phase=self.train_phase, name="conv2")
+				print conv2.get_shape()
+				conv3 = conv_2d(conv2, output_chan= 64, kernel=[3, 3], stride=[3, 3], use_bn=True, activation=leaky_relu,
+					train_phase=self.train_phase, name="conv3")
+				print conv3.get_shape()
+				conv4 = conv_2d(conv2, output_chan= 64, kernel=[5, 5], stride=[3, 3], use_bn=True, activation=leaky_relu,
+					train_phase=self.train_phase, name="conv4")
+				print conv4.get_shape()
+				in_concat = tf.concat([conv3, conv4, trans_conv2], axis=3,name="concat1")
+				upsample1 = unpool(in_concat, [3,3], "upsample1")
+				conv5 = conv_2d(upsample1, output_chan=32, kernel=[3,3], stride=[1,1], use_bn=True, activation=leaky_relu,
+					train_phase=self.train_phase, name="conv5")
+				print conv5.get_shape()
+				conv2_pad = tf.pad(conv2, [[0, 0], [0, 0], [1, 1], [0, 0]], "SYMMETRIC")
+				in_concat = tf.concat([conv2_pad, conv5, trans_conv3], axis=3, name="concat2")
+				upsample2 = unpool(in_concat, [2,2], "upsample2")
+				conv6 = conv_2d(upsample2, output_chan=16, kernel=[3,3], stride=[1, 1], use_bn=True, activation=leaky_relu,
+					train_phase=self.train_phase, name="conv6")
+				print conv6.get_shape()
+				print trans_conv4[:,:,2:-2,:].get_shape()
+				in_concat = tf.concat([conv1, conv6[:,:,2:-2,:], trans_conv4], axis=3, name="concat3")
+				conv7 = conv_2d(in_concat, output_chan=3, kernel=[3,3], stride=[1,1], use_bn=False, activation=tf.tanh,
+					train_phase=self.train_phase, name="conv7")
+				print conv7.get_shape()
+			
+		return conv7, trans_conv4
 
 	def _discriminator(self, gen_input, gen_output, reuse):
 		with tf.variable_scope("discriminator", reuse=reuse) as scope:
@@ -91,13 +106,13 @@ class dehazeGan(object):
 		with tf.name_scope("Inputs") as scope:
 			self.haze_in = tf.placeholder(tf.float32, shape=[None,240,320,3], name="Haze_Image")
 			self.clear_in = tf.placeholder(tf.float32, shape=[None,240,320,3], name="Clear_Image")
-			# self.trans_in = tf.placeholder(tf.float32, shape=[None,240,320,1], name="Trans_Map")
+			self.trans_in = tf.placeholder(tf.float32, shape=[None,240,320,1], name="Trans_Map")
 			self.train_phase = tf.placeholder(tf.bool, name="is_training")
 			hazy_summ = tf.summary.image("Hazy_image", (self.haze_in+1)/2)
 			clear_summ = tf.summary.image("clear_in", (self.clear_in+1)/2)
 
 		with tf.name_scope("Model") as scope:
-			self.gen_out = self._generator(self.haze_in)
+			self.gen_out, self.trans_out = self._generator(self.haze_in)
 			self.dis_real = self._discriminator(self.haze_in, self.clear_in, reuse=False)
 			self.dis_fake = self._discriminator(self.haze_in, self.gen_out, reuse=True)
 			gen_out_summ = tf.summary.image("output_image", (self.gen_out+1)/2)
@@ -106,11 +121,13 @@ class dehazeGan(object):
 			self.dis_loss = tf.reduce_mean(-(tf.log(self.dis_real + 1e-12) + tf.log(1 - self.dis_fake + 1e-12)), name="dis_loss")
 			self.gen_ad_loss = tf.reduce_mean(-tf.log(self.dis_fake + 1e-12), name="gen_ad_loss")
 			self.gen_L1_loss = tf.reduce_mean(tf.abs(self.clear_in - self.gen_out), name="gen_L1_loss")
-			self.gen_loss = self.gen_ad_loss+100.0*self.gen_L1_loss
+			self.trans_loss = tf.losses.mean_squared_error(self.trans_out, self.trans_in)
+			self.gen_loss = self.gen_ad_loss+100.0*(self.gen_L1_loss+self.trans_loss)
 
 			dis_loss_summ = tf.summary.scalar("dis_loss", self.dis_loss)
 			gen_l1_summ = tf.summary.scalar("gen_l1", self.gen_L1_loss)
 			gen_ad_summ = tf.summary.scalar("gen_ad_loss", self.gen_ad_loss)
+			trans_summ = tf.summary.scalar("trans_loss", self.trans_loss)
 							 
 		with tf.name_scope("Optimizers") as scope:
 			dis_var_list = [var for var in tf.trainable_variables() if "discriminator" in var.name]
@@ -122,7 +139,7 @@ class dehazeGan(object):
   			with tf.control_dependencies(update_ops):
 				self.gen_solver = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5).minimize(self.gen_loss, var_list=gen_var_list)
 
-			self.gen_summ = tf.summary.merge([hazy_summ, clear_summ, gen_out_summ, gen_l1_summ, gen_ad_summ])
+			self.gen_summ = tf.summary.merge([gen_l1_summ, gen_ad_summ, trans_summ])
 			self.dis_summ = tf.summary.merge([dis_loss_summ])
 
 		config = tf.ConfigProto()
@@ -139,36 +156,37 @@ class dehazeGan(object):
 		self.file.write("Number of Parameters: {}\n".format(no_params))
 		self.file.write("Number of Generator Parameters: {}\n".format(gen_params))
 
-	def train_model(self, train_imgs, val_imgs, learning_rate=1e-5, batch_size=32, epoch_size=50):
+	def train_model(self, train_imgs1, train_imgs2,val_imgs1, val_imgs2, learning_rate=1e-5, batch_size=32, epoch_size=50):
 		
-		print "Training Images: ", train_imgs.shape[0] 
-		print "Validation Images: ", val_imgs.shape[0]
-		# print "Training Images: ", train_imgs[0].shape[0] 
-		# print "Validation Images: ", val_imgs[0].shape[0]
+		print "Training Images: ", train_imgs1.shape[0] 
+		print "Validation Images: ", val_imgs1.shape[0]
+		# print "Training Images: ", train_imgs1[0].shape[0] 
+		# print "Validation Images: ", val_imgs1[0].shape[0]
 		print "Learning_rate: ", learning_rate, "Batch_size", batch_size, "Epochs", epoch_size
 		raw_input("Training will start above configuration. Press Enter to Start....")
 		count = 0
 		min_val_loss = 100.0
 		with tf.name_scope("Training") as scope:
 			for epoch in range(epoch_size):
-				for itr in xrange(0, train_imgs.shape[0]-batch_size, batch_size):
-					# haze_in = train_imgs[0][itr:itr+batch_size,0]
-					# clear_in = train_imgs[0][itr:itr+batch_size,1]
-					# trans_in = train_imgs[1][itr:itr+batch_size]
+				for itr in xrange(0, train_imgs1.shape[0]-batch_size, batch_size):
+					# haze_in = train_imgs1[0][itr:itr+batch_size,0]
+					# clear_in = train_imgs1[0][itr:itr+batch_size,1]
+					# trans_in = train_imgs1[1][itr:itr+batch_size]
 						
-					haze_in = train_imgs[itr:itr+batch_size,0]
-					clear_in = train_imgs[itr:itr+batch_size,1]
+					haze_in = train_imgs1[itr:itr+batch_size,0]
+					clear_in = train_imgs1[itr:itr+batch_size,1]
+					trans_in = train_imgs2[itr:itr+batch_size]
 
 					dis_in = [self.dis_solver, self.dis_loss, self.dis_summ]
-					dis_out = self.sess.run(dis_in, {self.haze_in:haze_in, self.clear_in: clear_in, self.train_phase:True})
+					dis_out = self.sess.run(dis_in, {self.haze_in:haze_in, self.clear_in: clear_in, self.trans_in:trans_in,self.train_phase:True})
 
-					sess_in = [self.gen_solver, self.gen_ad_loss, self.gen_L1_loss, self.gen_summ]
-					gen_out = self.sess.run(sess_in, {self.haze_in:haze_in, self.clear_in: clear_in, self.train_phase:True})
+					sess_in = [self.gen_solver, self.gen_ad_loss, self.gen_L1_loss, self.gen_summ, self.trans_loss]
+					gen_out = self.sess.run(sess_in, {self.haze_in:haze_in, self.clear_in: clear_in, self.trans_in:trans_in,self.train_phase:True})
 					
 					if itr%5==0:
 						print "Epoch:", epoch, "Iteration:", itr/batch_size, "Dis Loss:", dis_out[1], "Gen L1:", gen_out[2], \
-						"Gen adver:", gen_out[1]
-						self.file.write("Epoch: {} Iteration: {} Dis Loss: {} Gen L1: {} Gen adver: {} \n".format(epoch, itr/batch_size, dis_out[1], gen_out[2], gen_out[1]))
+						"Gen adver:", gen_out[1], "Trans:", gen_out[4]
+						self.file.write("Epoch: {} Iteration: {} Dis Loss: {} Gen L1: {} Gen adver: {} Trans: {} \n".format(epoch, itr/batch_size, dis_out[1], gen_out[2], gen_out[1], gen_out[4]))
 					 
 					self.train_writer.add_summary(dis_out[2], count)
 					self.train_writer.add_summary(gen_out[3], count)
@@ -176,21 +194,21 @@ class dehazeGan(object):
 					
 				lol=0
 				val_sum=0
-				for itr in xrange(0, val_imgs.shape[0]-batch_size, batch_size):
-					haze_in = val_imgs[itr:itr+batch_size,0]
-					clear_in = val_imgs[itr:itr+batch_size,1]
-					# trans_in = val_imgs[1][itr:itr+batch_size]
+				for itr in xrange(0, val_imgs1.shape[0]-batch_size, batch_size):
+					haze_in = val_imgs1[itr:itr+batch_size,0]
+					clear_in = val_imgs1[itr:itr+batch_size,1]
+					trans_in = val_imgs2[itr:itr+batch_size]
 
-					sess_in = [self.dis_loss, self.gen_ad_loss, self.gen_L1_loss,self.dis_summ, self.gen_summ, self.gen_out]
+					sess_in = [self.dis_loss, self.gen_ad_loss, self.gen_L1_loss,self.dis_summ, self.gen_summ, self.gen_out, self.trans_out, self.trans_loss]
 					sess_out = self.sess.run(sess_in, {self.haze_in: haze_in, 
-												self.clear_in: clear_in,self.train_phase:False})
+												self.clear_in: clear_in,self.trans_in:trans_in,self.train_phase:False})
 					self.val_writer.add_summary(sess_out[3], count)
 					self.val_writer.add_summary(sess_out[4], count)
 
 					print "Validation Epoch:", epoch, "Iteration:", itr/batch_size, "Dis Loss:", sess_out[0], "Gen L1:", sess_out[2], \
-						"Gen adver:", sess_out[1]
-					self.file.write("Validation Epoch: {} Iteration: {} Dis Loss: {} Gen L1: {} Gen adver: {} \n".format(epoch, itr/batch_size, \
-						sess_out[0], sess_out[2], sess_out[1]))
+						"Gen adver:", sess_out[1], "Trans:", sess_out[7] 
+					self.file.write("Validation Epoch: {} Iteration: {} Dis Loss: {} Gen L1: {} Gen adver: {} Trans: {} \n".format(epoch, itr/batch_size, \
+						sess_out[0], sess_out[2], sess_out[1], sess_out[7]))
 					lol+=1
 					val_sum+=sess_out[2]
 				val_loss = val_sum/lol
@@ -204,6 +222,8 @@ class dehazeGan(object):
 				idx = np.random.randint(batch_size)
 				stack = np.hstack((haze_in[idx], clear_in[idx], sess_out[5][idx]))
 				cv2.imwrite(self.output_path +str(epoch)+"_train_img.jpg", (stack+1)*127.5)
+				stack = np.hstack((trans_in[idx],sess_out[6][idx]))
+				cv2.imwrite(self.output_path +str(epoch)+"_train_trans_img.jpg", (stack+1)*127.5)
 			self.file.close()
 
 	def single_img_pass(self, input_imgs, x, y, is_train):

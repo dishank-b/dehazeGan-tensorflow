@@ -40,12 +40,14 @@ if not os.path.exists(model_path):
 
 ######### Loading Data ###########
 train_img1 = np.load(data_path+"train_haze_clear.npy") # First image of each pair is hazy image and second image is clear images
-# train_img2 = 1/255.0*np.load(data_path+"train_trans.npy") 
+train_img2 = np.load(data_path+"train_trans.npy") 
 val_img1 = np.load(data_path+"val_haze_clear.npy")
-# val_img2 = 1/255.0*np.load(data_path+"val_trans.npy")	   
+val_img2 = np.load(data_path+"val_trans.npy")	   
 
-train_img1 = train_img1.astype(float)/127.5 - 1.0
-val_img1 = val_img1.astype(float)/127.5 - 1.0
+train_img1 = train_img1[:4000].astype(float)/127.5 - 1.0
+train_img2 = train_img2[:4000].astype(float)/127.5 - 1.0
+val_img1 = val_img1[:500].astype(float)/127.5 - 1.0
+val_img2 = val_img2[:500].astype(float)/127.5 - 1.0
 print train_img1.min(), train_img1.max()
 
 print "Data Loaded"
@@ -57,7 +59,7 @@ if mode=='train':
 	nnet.build_model()
 	print "Model Build......"
 	# nnet.train_model([train_img1, train_img2],[val_img1,val_img2] , learning_rate, batch_size, epoch_size)
-	nnet.train_model(train_img1[:4000] , val_img1[:500], learning_rate, batch_size, epoch_size)
+	nnet.train_model(train_img1,train_img2, val_img1, val_img2,learning_rate, batch_size, epoch_size)
 else:
 	predict_clear= nnet.test(train_img1[:4000,0,:,:,:], batch_size)
 	# predict_clear= nnet.test(batch_size)

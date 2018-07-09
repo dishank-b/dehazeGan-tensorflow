@@ -1,21 +1,20 @@
 model_params:  
   descrip: |
             
-            -Experiment 6
-            -U-net kind of architecture with inception block
+            -Experiment 8
+            -U-net kind of architecture with inception block for clear image, with transMap also for decoer part
             -No Deconv layer is used in this, upsampling is done and then conv is used.
-            -Numbers of feature map are in order of 16, 32,128,32,16,3
+            -Numbers of feature map are in order of 16, 32,64,32,16,3
             -Batch Norm is used in all just not in first and last
-            -No transMap inforamtion is used
-            -No loss other than adversarial loss and L1 loss is used.
+            -No loss other than adversarial loss and L1 loss is used and MSE for transMap
             -Discriminator is taken from pix2pix-affiine_layer with some changes in no. of feature_maps
             -All hyper parameters same as used in my_pix2pix, only the changes is made in gen and Discriminator
             -No weight regularization
-            -Difference from Exp 5: No of features maps in conv layers. 
+            -Difference from Exp 6: Use of TransMap  
 
-  model_name: "U-net-inception-noDecovn" # DD or MSCNN or AOD or pix2pix or 
+  model_name: "U-net-inception-noDecovn-TransMap" # DD or MSCNN or AOD or pix2pix or 
   mode: "train"   # train or test
-  log_dir: /media/dishank/dehazeGan_logs/ # path to write the model and load the model
+  log_dir: /media/mnt/dehaze/dehazeGan_logs/ # path to write the model and load the model
 
 training_params:
   learning_rate: 1e-04
